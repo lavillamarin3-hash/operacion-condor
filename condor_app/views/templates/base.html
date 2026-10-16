@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Operación Cóndor: portal militar ficticio para un laboratorio educativo de Cociber CTF.">
+  <meta name="theme-color" content="#172a25">
+  <title>{% block title %}Inicio{% endblock %} · {{ site_name }}</title>
+  <link rel="icon" href="{{ url_for('static', filename='images/condor-shield.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <a class="skip-link" href="#contenido">Ir al contenido</a>
+  <div class="academic-bar">
+    <div class="container academic-bar-inner">
+      <span class="ctf-wordmark">COCIBER <b>CTF</b><span class="wordmark-divider"></span>LABORATORIO INTERACTIVO</span>
+      <span class="simulation-badge"><span class="status-dot"></span>{{ fiction_notice }}</span>
+    </div>
+  </div>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="{{ url_for('public.index') }}" aria-label="Unidad Cóndor, ir al inicio">
+        <img src="{{ url_for('static', filename='images/condor-shield.svg') }}" width="52" height="60" alt="Escudo ficticio de la unidad Cóndor">
+        <span><strong>UNIDAD CÓNDOR</strong><small>Portal de formación · Ecuador</small></span>
+      </a>
+      <nav class="main-nav" aria-label="Navegación principal">
+        <a href="{{ url_for('public.index') }}" {% if request.endpoint == 'public.index' %}aria-current="page"{% endif %}>Inicio</a>
+        <a href="{{ url_for('public.news') }}" {% if request.endpoint == 'public.news' %}aria-current="page"{% endif %}>Noticias</a>
+        {% if current_user %}
+          <a class="nav-access" href="{{ url_for('admin.dashboard') }}" {% if request.endpoint == 'admin.dashboard' %}aria-current="page"{% endif %}><span class="icon-lock" aria-hidden="true"></span>Centro de mando</a>
+        {% else %}
+          <a class="nav-access" href="{{ url_for('auth.login') }}" {% if request.endpoint == 'auth.login' %}aria-current="page"{% endif %}><span class="icon-lock" aria-hidden="true"></span>Acceso del personal</a>
+        {% endif %}
+      </nav>
+    </div>
+    <div class="ecuador-stripe" aria-hidden="true"></div>
+  </header>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="container flash-area" aria-live="polite">
+        {% for category, message in messages %}<div class="notice notice-{{ category }}" role="status">{{ message }}</div>{% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+  <main id="contenido">{% block content %}{% endblock %}</main>
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div><strong>OPERACIÓN CÓNDOR</strong><p>Una experiencia de aprendizaje de Cociber CTF.</p></div>
+      <p class="footer-disclaimer">Unidad, personas y datos inventados.<br>Sin vínculo con instituciones militares reales.</p>
+      <span class="footer-lab">ENTORNO DE PRÁCTICA<span class="status-dot"></span></span>
+    </div>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Acceso del personal{% endblock %}
+{% block body_class %}login-page{% endblock %}
+{% block content %}
+<section class="login-layout">
+  <div class="login-story"><div class="login-story-content"><p class="eyebrow"><span class="gold-line"></span>OPERACIÓN CÓNDOR</p><h1>La información correcta.<br>En las manos correctas.</h1><p>Portal de servicios y comunicados de la unidad ficticia Cóndor.</p><div class="login-story-footer"><span class="status-dot"></span>ENTORNO DE ENTRENAMIENTO COCIBER CTF</div></div></div>
+  <div class="login-form-area"><div class="login-card"><img class="login-shield" src="{{ url_for('static', filename='images/condor-shield.svg') }}" width="64" height="74" alt="Escudo ficticio Cóndor"><p class="eyebrow eyebrow-dark">PORTAL DEL PERSONAL</p><h2>Bienvenido a tu unidad</h2><p class="login-subtitle">Introduce tu cuenta para acceder al centro de mando.</p>
+    {% if error %}<div class="notice notice-error" role="alert">{{ error }}</div>{% endif %}
+    <form action="{{ url_for('auth.login') }}" method="post" class="stacked-form">
+      <div class="field"><label for="username">Usuario</label><input id="username" name="username" type="text" required maxlength="80" autocomplete="username" spellcheck="false" placeholder="Tu cuenta del personal"></div>
+      <div class="field"><label for="password">Contraseña</label><input id="password" name="password" type="password" required maxlength="256" autocomplete="current-password" placeholder="Introduce tu contraseña"></div>
+      <button class="button button-dark button-full" type="submit">Ingresar al portal <span aria-hidden="true">→</span></button>
+    </form>
+    <div class="login-help"><span class="help-mark" aria-hidden="true">i</span><p>¿Buscas información del acceso?<br>Consulta el <a href="{{ url_for('public.news') }}#portal">aviso de servicios digitales</a>.</p></div>
+    <p class="login-footnote">Cuenta y datos de práctica. No utilices contraseñas personales.</p>
+  </div></div>
+</section>
+{% endblock %}
