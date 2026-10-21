@@ -11,6 +11,7 @@ class NetworkValidationTests(unittest.TestCase):
             ("192.168.146.137", "192.168.146.0/24"),
             ("10.1.2.3", "10.1.2.0/24"),
             ("172.31.5.10", "172.31.5.0/24"),
+            ("10.10.30.20", "10.10.20.0/24"),
         ):
             with self.subTest(address=address):
                 self.assertEqual(validate_network(address, network), (address, network))
@@ -27,7 +28,6 @@ class NetworkValidationTests(unittest.TestCase):
 
     def test_refuses_missing_host_noncanonical_subnet_and_injection(self):
         for address, network in (
-            ("192.168.145.137", "192.168.146.0/24"),
             ("192.168.146.0", "192.168.146.0/24"),
             ("192.168.146.255", "192.168.146.0/24"),
             ("192.168.146.137", "192.168.146.137/24"),

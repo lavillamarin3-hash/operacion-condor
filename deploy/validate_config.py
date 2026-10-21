@@ -22,8 +22,10 @@ def validate_network(server_ip: str, lab_cidr: str) -> tuple[str, str]:
         raise ValueError("La subred del laboratorio debe estar dentro de una red privada RFC1918.")
     if network.prefixlen > 30:
         raise ValueError("Usa una subred con espacio para la víctima y Kali, por ejemplo /24.")
-    if address not in network or address in (network.network_address, network.broadcast_address):
-        raise ValueError("La IP del servidor debe ser una dirección de equipo dentro de la subred indicada.")
+    # lab_cidr is the allowed CLIENT network. Routed VLANs need not share
+    # the victim's subnet (for example Kali VLAN20 -> victim VLAN30).
+    if address in network and address in (network.network_address, network.broadcast_address):
+        raise ValueError("La IP del servidor debe ser una dirección de equipo, no la dirección de red o broadcast.")
     return str(address), str(network)
 
 

@@ -7,10 +7,11 @@ from flask.cli import with_appcontext
 from werkzeug.security import generate_password_hash
 
 from condor_app.db import get_db, initialize_schema
+from condor_app.config import DEFAULT_ADMIN_USERNAME
 from condor_app.models import lab, user
 
 
-ADMIN_USERNAME = "admin.condor"
+ADMIN_USERNAME = DEFAULT_ADMIN_USERNAME
 
 
 @click.command("init-lab")
@@ -18,6 +19,7 @@ ADMIN_USERNAME = "admin.condor"
 def init_lab_command():
     """Initialize private SQLite data once; existing credentials/flag are preserved."""
     password = current_app.config.get("LAB_ADMIN_PASSWORD") or os.environ.get("CONDOR_ADMIN_PASSWORD")
+    username = current_app.config["LAB_ADMIN_USERNAME"]
     flag_value = current_app.config.get("LAB_FLAG") or os.environ.get("CONDOR_FLAG")
     if not password or len(password) < 8 or len(password) > 256:
         raise click.ClickException("Configura CONDOR_ADMIN_PASSWORD (8 a 256 caracteres)")
@@ -35,9 +37,9 @@ def init_lab_command():
     initialize_schema()
     connection = get_db()
     try:
-        existing = user.find_by_username(ADMIN_USERNAME)
+        existing = user.find_by_username(username)
         if existing is None:
-            user.create_admin(ADMIN_USERNAME, generate_password_hash(password))
+            user.create_admin(username, generate_password_hash(password))
         lab.set_initial_flag(flag_value)
         connection.commit()
     except Exception:

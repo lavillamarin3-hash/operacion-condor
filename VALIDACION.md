@@ -1,15 +1,15 @@
 # Comprobaciones de entrega
 
-Validado el 16 de octubre de 2026 con Ubuntu 26.04 y Python 3.14 en un contenedor de prueba, separado de las VMs y de los datos de Cociber CTF.
+Revisión final del **21 de octubre de 2026**. Las pruebas automatizadas se ejecutan con una base SQLite temporal, separadas de las VMs y de los datos de Cociber CTF.
 
-- 11 pruebas de aplicación aprobadas: acceso, sesiones, CSRF, permisos, inicialización idempotente, escape HTML, rechazo de Host y entrega de flag después de publicar.
-- 4 pruebas de parámetros de red aprobadas: redes RFC1918, rechazo de direcciones públicas y entradas no válidas.
-- `bash -n deploy/install.sh`, `--help` y `--validate-only` aprobados.
-- Comprobación HTTP real con Gunicorn sin privilegios: Nmap detectó el puerto; Hydra encontró la cuenta de práctica usando las 12 candidatas; una sesión real publicó un comunicado y recibió la flag; la portada mostró el comunicado y no reveló la flag.
-- La plantilla Nginx del instalador pasó `nginx -t`; se verificaron proxy HTTP, respuesta 200 desde la dirección permitida y 403 desde una excluida en una prueba de loopback.
-- Portada, noticias, acceso y panel revisados en el navegador.
+- **16 pruebas de aplicación aprobadas:** autenticación, sesiones, CSRF, inicialización idempotente, escape HTML, rechazo de Host y flag únicamente después de publicar en la sesión autorizada.
+- Incluyen la cadena de reconocimiento `robots.txt` → manifiesto → cuentas/bitácora, la deducción única por perfil y último estado, los señuelos, el diccionario configurado y los intentos HTTP acotados. No requieren que el HTML publique una cuenta o un enlace al diccionario.
+- **9 pruebas de despliegue aprobadas:** validación de redes privadas, direcciones no válidas y red cliente en otra VLAN; controles de procesos propios mediante UID, argumentos e identidad de inicio; rechazo de un archivo de secretos con permisos abiertos y de un listener ajeno.
+- Las pruebas de proceso son verificaciones de seguridad del controlador; no sustituyen una instalación de Gunicorn en Ubuntu. La prueba de aplicación usa el cliente HTTP de Flask, sin un escaneo Nmap ni una ejecución real de Hydra en esta revisión.
 
-Para repetir las pruebas de aplicación y parámetros desde el paquete extraído:
+La entrega original del 16 de octubre registró comprobaciones en un contenedor Ubuntu 26.04 con Python 3.14, Gunicorn, Nmap, Hydra y Nginx, además de una revisión visual. Aquellas pruebas preceden la nueva cadena de reconocimiento y no prueban el despliegue actual en una VM.
+
+Para repetir las pruebas de aplicación y despliegue desde el repositorio:
 
 ```bash
 python3 -m venv .venv
@@ -17,6 +17,9 @@ python3 -m venv .venv
 .venv/bin/python -m unittest discover -s tests -v
 .venv/bin/python -m unittest discover -s deploy -v
 bash -n deploy/install.sh
+sh -n deploy/install-user.sh
 ```
 
-La prueba en contenedor no arranca una VM Ubuntu con systemd como PID 1. La instalación completa del servicio y su arranque después de reiniciar deben verificarse en la VM con los comandos de la guía. Este paquete todavía no se ha instalado en tu VM Ubuntu ni está integrado automáticamente con el inicio de retos o el puntaje de Cociber CTF.
+La comprobación de sintaxis de shell debe ejecutarse en Linux. En esta revisión no se inició systemd, no se instaló el paquete en una víctima y no se efectuó una prueba de red entre VLANs. El inicio real, la conectividad y el arranque después de reiniciar se verifican en la VM con los comandos de la guía correspondiente.
+
+Consulta la [guía genérica de Ubuntu](GUIA_UBUNTU_26_04.md) y la [guía de LAB-SRVWEB](GUIA_LAB_SRVWEB.md). Ninguna de estas comprobaciones acredita por sí misma que el sitio ya esté instalado en LAB-SRVWEB. La integración automática con la creación de VMs y el puntaje de Cociber CTF es un trabajo separado.

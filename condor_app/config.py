@@ -1,8 +1,12 @@
 """Environment configuration for the isolated, deliberately vulnerable lab."""
 
 import os
+import re
 from datetime import timedelta
 from pathlib import Path
+
+
+DEFAULT_ADMIN_USERNAME = "admin.condor"
 
 
 def _boolean(name, default=False):
@@ -19,6 +23,7 @@ def _boolean(name, default=False):
 def environment_config(instance_path):
     return {
         "SECRET_KEY": os.environ.get("CONDOR_SECRET_KEY"),
+        "LAB_ADMIN_USERNAME": os.environ.get("CONDOR_ADMIN_USERNAME", DEFAULT_ADMIN_USERNAME),
         "DATABASE": os.environ.get(
             "CONDOR_DATABASE", str(Path(instance_path) / "condor.sqlite3")
         ),
@@ -44,6 +49,9 @@ def environment_config(instance_path):
 
 
 def validate_config(config):
+    username = config.get("LAB_ADMIN_USERNAME")
+    if not isinstance(username, str) or not re.fullmatch(r"[a-z][a-z0-9._-]{2,39}", username):
+        raise RuntimeError("LAB_ADMIN_USERNAME debe tener de 3 a 40 caracteres: letras minúsculas, números, punto, guion o guion bajo")
     if not config.get("TESTING"):
         secret = config.get("SECRET_KEY")
         if not isinstance(secret, str) or len(secret) < 32:

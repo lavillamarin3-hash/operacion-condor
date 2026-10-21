@@ -14,6 +14,7 @@ Ejemplo:
 
 Instala Flask + Gunicorn en un venv y un sitio Nginx en IP_PRIVADA:8080.
 La IP debe existir en esta VM. --validate-only solo valida los parámetros.
+--lab-cidr indica la subred cliente autorizada; puede estar en otra VLAN.
 Conserva la base de datos, la contraseña y la flag al reinstalar.
 No modifica UFW, SSH, sitios Nginx ajenos ni el sitio predeterminado.
 HELP
@@ -209,7 +210,8 @@ cat > "$UNIT" <<'UNIT'
 # COCIBER_CONDOR_MANAGED_V1
 [Unit]
 Description=Cociber CTF - Operación Cóndor (laboratorio privado)
-After=network.target
+Wants=network-online.target
+After=network-online.target
 
 [Service]
 Type=simple
@@ -272,10 +274,13 @@ systemctl reload nginx.service
 
 READY=false
 for attempt in {1..15}; do
-    if curl --silent --show-error --fail --max-time 3 "http://$SERVER_IP:8080/healthz" >/dev/null 2>&1; then READY=true; break; fi
+    # The server can be outside the allowed client VLAN. Check Gunicorn locally;
+    # the end-to-end Nginx/routing check must be run from the allowed Kali VLAN.
+    if curl --silent --show-error --fail --max-time 3 "http://127.0.0.1:18080/healthz" >/dev/null 2>&1; then READY=true; break; fi
     sleep 1
 done
 "$READY" || die 'El servicio no respondió. Revisa sudo journalctl -u condor-lab -n 50 --no-pager.'
 printf '\nListo. Portal: http://%s:8080/\n' "$SERVER_IP"
 printf 'Acceso permitido únicamente desde %s. La contraseña y la flag se conservan en un archivo root:root 600.\n' "$LAB_CIDR"
 printf 'No se modificaron las reglas de UFW ni el servicio SSH.\n'
+printf 'Comprueba desde Kali el portal y /healthz; la comprobación local verificó Gunicorn.\n'

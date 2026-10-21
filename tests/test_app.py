@@ -1,3 +1,5 @@
+import csv
+import io
 import tempfile
 import unittest
 from pathlib import Path
@@ -22,6 +24,7 @@ class CondorLabTests(unittest.TestCase):
             "WORDLIST_PATH": str(wordlist),
             "TRUSTED_HOSTS": ["localhost"],
             "LAB_ADMIN_PASSWORD": self.password,
+            "LAB_ADMIN_USERNAME": "admin.condor",
             "LAB_FLAG": self.flag,
         }
         self.app = create_app(self.config)
@@ -154,6 +157,121 @@ class CondorLabTests(unittest.TestCase):
             self.client.post("/login", data={"username": "admin.condor", "password": "PrivateWrongValue"})
         self.assertNotIn("PrivateWrongValue", " ".join(logs.output))
         self.assertIn("lab_login failure", " ".join(logs.output))
+
+    def discover_accounts(self, client=None):
+        client = client or self.client
+        robots = client.get("/robots.txt").get_data(as_text=True)
+        manifest_path = next(
+            line.partition(":")[2].strip()
+            for line in robots.splitlines() if line.startswith("Disallow:")
+        )
+        manifest = client.get(manifest_path).get_json()
+        paths = manifest["archivos"]
+        accounts = list(csv.DictReader(io.StringIO(
+            client.get(paths["cuentas"]).get_data(as_text=True)
+        )))
+        events = client.get(paths["bitacora"]).get_json()["eventos"]
+        latest_events = {}
+        for event in events:
+            account_id = event["cuenta_id"]
+            if account_id not in latest_events or event["secuencia"] > latest_events[account_id]["secuencia"]:
+                latest_events[account_id] = event
+        rule = manifest["regla_publicacion"]
+        eligible = [
+            account for account in accounts
+            if account["perfil"] == rule["perfil_requerido"]
+            and latest_events[account["id"]]["estado"] == rule["estado_requerido"]
+        ]
+        return manifest, accounts, eligible
+
+    def test_html_does_not_give_username_dictionary_or_access_solution(self):
+        for path in ("/", "/noticias", "/login"):
+            response = self.client.get(path)
+            self.assertEqual(response.status_code, 200)
+            page = response.get_data(as_text=True)
+            for hidden_value in (
+                "admin.condor", self.password, self.flag,
+                "/recursos/candidatas.txt", "/respaldo/operaciones/",
+            ):
+                self.assertNotIn(hidden_value, page)
+        # Failure remains a stable marker for the terminal HTTP exercise.
+        failed_login = self.client.post("/login", data={"username": "wrong", "password": "wrong"})
+        self.assertIn(b"Credenciales incorrectas", failed_login.data)
+
+    def test_reconnaissance_requires_latest_state_and_has_one_eligible_account(self):
+        manifest, accounts, eligible = self.discover_accounts()
+        self.assertEqual(len(accounts), 5)
+        self.assertGreater(len([account for account in accounts if account["perfil"] == "editor"]), 1)
+        self.assertEqual([account["usuario"] for account in eligible], ["admin.condor"])
+        for name in ("cuentas", "bitacora"):
+            response = self.client.get(manifest["archivos"][name])
+            self.assertEqual(response.status_code, 200)
+            self.assertNotIn(self.flag.encode(), response.data)
+            self.assertNotIn(self.password.encode(), response.data)
+            self.assertNotIn(b"password_hash", response.data)
+        # An obsolete editor record looks plausible, but cannot authenticate.
+        for account in accounts:
+            response = self.client.post("/login", data={
+                "username": account["usuario"], "password": self.password,
+            })
+            self.assertEqual(response.status_code, 302 if account in eligible else 200)
+
+    def test_terminal_discovery_and_bounded_dictionary_reach_admin_but_not_flag(self):
+        manifest, _accounts, eligible = self.discover_accounts()
+        candidates = self.client.get(manifest["archivos"]["diccionario"]).get_data(as_text=True).splitlines()
+        self.assertGreaterEqual(len(candidates), 2)
+        self.assertLessEqual(len(candidates), 50)
+        successes = []
+        for candidate in candidates:
+            response = self.client.post("/login", data={
+                "username": eligible[0]["usuario"], "password": candidate,
+            })
+            if response.status_code == 302:
+                successes.append(candidate)
+            else:
+                self.assertIn(b"Credenciales incorrectas", response.data)
+        self.assertEqual(successes, [self.password])
+        dashboard = self.client.get("/admin")
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertNotIn(self.flag.encode(), dashboard.data)
+        denied = self.client.post("/admin/comunicados", data={
+            "title": "Auditoría terminal", "body": "Prueba sin token: no debe publicar.",
+        })
+        self.assertEqual(denied.status_code, 403)
+        self.assertNotIn(self.flag.encode(), self.client.get("/admin").data)
+
+    def test_artifact_urls_and_login_redirect_respect_wsgi_mount_prefix(self):
+        prefix = "/practice/abc123"
+        env = {"SCRIPT_NAME": prefix}
+        robots = self.client.get("/robots.txt", environ_overrides=env).get_data(as_text=True)
+        manifest_path = next(line.partition(":")[2].strip() for line in robots.splitlines() if line.startswith("Disallow:"))
+        self.assertEqual(manifest_path, prefix + "/respaldo/operaciones/manifest.json")
+        manifest = self.client.get(manifest_path.removeprefix(prefix), environ_overrides=env).get_json()
+        for path in manifest["archivos"].values():
+            self.assertTrue(path.startswith(prefix + "/"))
+            self.assertEqual(self.client.get(path.removeprefix(prefix), environ_overrides=env).status_code, 200)
+        response = self.client.post("/login", data={
+            "username": "admin.condor", "password": self.password,
+        }, environ_overrides=env)
+        self.assertEqual(response.headers["Location"], prefix + "/admin")
+
+    def test_configured_run_username_is_used_for_initialization_and_discovery(self):
+        custom_username = "editor.pacifico"
+        configuration = dict(self.config, DATABASE=str(Path(self.tmp.name) / "run.sqlite3"), LAB_ADMIN_USERNAME=custom_username)
+        app = create_app(configuration)
+        result = app.test_cli_runner().invoke(args=["init-lab"])
+        self.assertEqual(result.exit_code, 0, result.output)
+        client = app.test_client()
+        _manifest, accounts, eligible = self.discover_accounts(client)
+        self.assertEqual([account["usuario"] for account in eligible], [custom_username])
+        self.assertEqual(len({account["usuario"] for account in accounts}), len(accounts))
+        with app.app_context():
+            self.assertIsNone(user.find_by_username("admin.condor"))
+        self.assertEqual(client.post("/login", data={"username": custom_username, "password": self.password}).status_code, 302)
+        self.assertEqual(client.post("/login", data={"username": "admin.condor", "password": self.password}).status_code, 200)
+        for invalid in ("", "../admin", "UpperCase", "a" * 41, None):
+            with self.subTest(username=invalid), self.assertRaisesRegex(RuntimeError, "LAB_ADMIN_USERNAME"):
+                create_app(dict(self.config, LAB_ADMIN_USERNAME=invalid))
 
 
 if __name__ == "__main__":
